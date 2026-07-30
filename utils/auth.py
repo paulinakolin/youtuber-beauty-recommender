@@ -6,12 +6,15 @@ SECRETS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 
 def configure_auth_from_env():
-    """Tulis .streamlit/secrets.toml dari nilai .env, supaya Streamlit
-    membaca kredensial login lewat mekanisme resminya (baca file),
-    bukan lewat suntik memori yang rawan masalah timing dengan on_click."""
-    os.makedirs(os.path.dirname(SECRETS_PATH), exist_ok=True)
+    """Tulis .streamlit/secrets.toml dari nilai .env — HANYA untuk dev lokal.
+    Di Streamlit Cloud, folder source bersifat read-only, jadi penulisan file
+    akan gagal secara sengaja di-skip (secrets di cloud sudah diisi langsung
+    lewat dashboard Settings > Secrets, jadi st.secrets/[auth] otomatis kebaca
+    tanpa perlu app menulis file apapun)."""
+    try:
+        os.makedirs(os.path.dirname(SECRETS_PATH), exist_ok=True)
 
-    content = f'''[auth]
+        content = f'''[auth]
 redirect_uri = "{os.getenv("REDIRECT_URI", "http://localhost:8501/oauth2callback")}"
 cookie_secret = "{os.getenv("COOKIE_SECRET", "")}"
 client_id = "{os.getenv("GOOGLE_CLIENT_ID", "")}"
@@ -19,15 +22,18 @@ client_secret = "{os.getenv("GOOGLE_CLIENT_SECRET", "")}"
 server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
 '''
 
-    # Hanya tulis ulang kalau isinya beda, supaya tidak trigger reload berlebihan
-    existing = ""
-    if os.path.exists(SECRETS_PATH):
-        with open(SECRETS_PATH, "r") as f:
-            existing = f.read()
+        existing = ""
+        if os.path.exists(SECRETS_PATH):
+            with open(SECRETS_PATH, "r") as f:
+                existing = f.read()
 
-    if existing.strip() != content.strip():
-        with open(SECRETS_PATH, "w") as f:
-            f.write(content)
+        if existing.strip() != content.strip():
+            with open(SECRETS_PATH, "w") as f:
+                f.write(content)
+    except OSError:
+        # Read-only filesystem (Streamlit Cloud) — secrets sudah diisi
+        # lewat dashboard, jadi aman untuk di-skip.
+        pass
 
 
 def require_login():
